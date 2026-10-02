@@ -1,0 +1,10 @@
+{
+  "execution": "Python SciPy; MATLAB not executed",
+  "drop_time_s": 0.46836795983668816,
+  "analytic_max_height_error_m": 1.2227406587239642e-12,
+  "vacuum_time_error_s": 3.3306690738754696e-16,
+  "max_step_halving_time_difference_s": 2.99704705497561e-13,
+  "drop_energy_max_increment_J": -2.7131769053667654e-13,
+  "pendulum_energy_max_increment_J": -2.4575243725149804e-11,
+  "checks": "PASS"
+}
