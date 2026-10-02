@@ -1,0 +1,75 @@
+camera_node:
+  ros__parameters:
+    camera_sn: KE0210080605
+    roi_width: 1280
+    roi_height: 1024
+    offset_x: 0
+    offset_y: 0
+    auto_exposure: false
+    exposure_time_us: 1800.0
+    auto_exposure_min_us: 500.0
+    auto_exposure_max_us: 10000.0
+    auto_gain: false
+    gain: 6.0
+    auto_gain_min: 5.0
+    auto_gain_max: 10.0
+    gray_value: 200
+    white_balance: true
+    flip_image: true
+    camera_info_url: ""
+    frame_id: camera_optical_frame
+    grab_timeout_ms: 500
+    reconnect_interval_s: 2.0
+    image_qos: sensor_data
+    image_queue_depth: 5
+    publish_rate_limit_hz: 0.0
+    diagnostic_period_s: 1.0
+
+detect_node:
+  ros__parameters:
+    image_topic: /camera_node/image_raw
+    camera_info_topic: /camera_node/camera_info
+    input_queue_depth: 1
+    use_camera_info: true
+    max_track_gap_s: 0.2
+    debug_image: true
+    diagnostic_period_s: 1.0
+    threshold:
+      hue_min: 35
+      hue_max: 95
+      saturation_min: 70
+      value_min: 100
+    filter:
+      min_area_px: 40.0
+      max_area_px: 1000000.0
+      min_radius_px: 3.0
+      max_radius_px: 1000.0
+      min_circularity: 0.65
+      min_fill_ratio: 0.45
+      max_aspect_ratio: 1.35
+    morphology:
+      kernel: 5
+      open_iterations: 1
+      close_iterations: 2
+    fallback_intrinsics:
+      width: 1280
+      height: 1024
+      fx: 1785.4881526822305
+      fy: 1785.026019470562
+      cx: 672.4806478241826
+      cy: 559.8960322479431
+
+mcu_node:
+  ros__parameters:
+    device: /dev/ttyACM0
+    baud_rate: 115200
+    publish_raw: false
+    diagnostic_period_s: 1.0
+    tx_stale_after_s: 2.0
+
+estimate_node:
+  ros__parameters:
+    detection_topic: /detect_node/detection
+    imu_topic: /mcu_node/message/rx
+    max_imu_age_s: 0.05
+    diagnostic_period_s: 1.0

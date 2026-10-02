@@ -13,6 +13,8 @@ float32 bearing_x_rad
 float32 bearing_y_rad
 float32 delta_bearing_x_rad
 float32 delta_bearing_y_rad
+float32 velocity_bearing_x_rad_s
+float32 velocity_bearing_y_rad_s
 float32 circularity
 float32 fill_ratio
 float32 score

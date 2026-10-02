@@ -16,7 +16,7 @@ class Probe(Node):
         super().__init__("green_light_validation_probe")
         self.result = None
         self.subscription = self.create_subscription(
-            GreenLight, "/green_light_detector/detection", self.receive, 10
+            GreenLight, "/detect_node/detection", self.receive, 10
         )
 
     def receive(self, message: GreenLight) -> None:
@@ -35,6 +35,10 @@ class Probe(Node):
                 "delta_bearing_rad": [
                     message.delta_bearing_x_rad,
                     message.delta_bearing_y_rad,
+                ],
+                "bearing_velocity_rad_s": [
+                    message.velocity_bearing_x_rad_s,
+                    message.velocity_bearing_y_rad_s,
                 ],
                 "circularity": message.circularity,
                 "fill_ratio": message.fill_ratio,

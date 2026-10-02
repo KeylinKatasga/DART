@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>dart_bringup</name>
+  <version>0.1.0</version>
+  <description>Unified launch and standard3 profile for DART perception.</description>
+  <maintainer email="2101276189@qq.com">littlehornet</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>camera_node</exec_depend>
+  <exec_depend>detect_node</exec_depend>
+  <exec_depend>estimate_node</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>mcu_node</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

@@ -1,15 +1,19 @@
 # DART
 
-仓库包含被动运动教学实验，以及 ROS 2 Humble/C++ OpenCV 圆形绿光视觉验证节点。
-当前视觉节点只发布目标像素位置、半径、帧间变化和相对光轴角度，不连接执行机构，
-也不发布飞行或 MCU 控制指令。
+仓库包含被动运动教学实验，以及 ROS 2 Humble/C++ OpenCV 圆形绿光验证链路。
+ROS 2 工作区按 `camera_node`、`detect_node`、`mcu_node`、`estimate_node` 划分；
+只发布测量和估计结果，不连接执行机构，也不发布 MCU 控制指令。
 
 ## 圆形绿光视觉验证
 
 代码位于 `ros2_ws/`：
 
 - `dart_interfaces`：结构化 `GreenLight` 消息；
-- `green_light_detector`：订阅 `ros_sp` 相机图像和 CameraInfo 的 C++ 节点；
+- `camera_node`：Daheng 相机采集（SN `KE0210080605`）；
+- `detect_node`：C++ OpenCV 圆形绿光检测；
+- `mcu_node`：经串口接收 MCU 的原始 IMU 数据；
+- `estimate_node`：将当前绿灯测量与时间最近的 IMU 样本配对；
+- `dart_bringup`：统一启动四节点；
 - `tools`：无相机时使用的合成移动绿圆发布器和正检探针。
 
 节点默认对接：
@@ -17,12 +21,23 @@
 - 相机 SN：`KE0210080605`；
 - 图像：`/camera_node/image_raw`；
 - 标定：`/camera_node/camera_info`；
-- 输出：`/green_light_detector/detection`；
-- 调试图：`/green_light_detector/debug_image`。
+- 检测输出：`/detect_node/detection`；
+- 调试图：`/detect_node/debug_image`；
+- MCU RX：`/mcu_node/message/rx`；
+- 估计输出：`/estimate_node/target`。
 
-构建与运行见 [`ros2_ws/src/green_light_detector/README.md`](ros2_ws/src/green_light_detector/README.md)，
-验证结果见 [`docs/绿灯识别验证记录.md`](docs/绿灯识别验证记录.md)。本仓库作为 overlay
-使用现有 `ros_sp` 相机节点；不会修改或复制 `ros_sp` 工作区。
+构建并启动完整链路：
+
+```bash
+cd ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+ros2 launch dart_bringup dart.launch.py
+```
+
+验证结果见 [`docs/绿灯识别验证记录.md`](docs/绿灯识别验证记录.md)，节点迁移范围见
+[`docs/ROS2节点迁移说明.md`](docs/ROS2节点迁移说明.md)。`ros_sp` 保持只读、未被修改。
 
 ## 原有被动运动教学实验
 

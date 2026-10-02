@@ -1,0 +1,32 @@
+std_msgs/Header header
+bool valid
+bool target_detected
+bool imu_valid
+# MCU IMU fields are passed through without unit conversion. Keep false until
+# the firmware unit and axis convention are verified on hardware.
+bool imu_units_verified
+uint64 detection_sequence
+uint64 imu_sequence
+builtin_interfaces/Time imu_stamp
+uint64 imu_device_sample_time_us
+float32 center_x_px
+float32 center_y_px
+float32 radius_px
+float32 bearing_x_rad
+float32 bearing_y_rad
+float32 los_rate_x_rad_s
+float32 los_rate_y_rad_s
+float32 imu_yaw_raw
+float32 imu_pitch_raw
+float32 imu_roll_raw
+float32 imu_yaw_velocity_raw
+float32 imu_pitch_velocity_raw
+float32 imu_roll_velocity_raw
+float32 imu_yaw_acceleration_raw
+float32 imu_pitch_acceleration_raw
+float32 imu_roll_acceleration_raw
+float32 imu_quaternion_w
+float32 imu_quaternion_x
+float32 imu_quaternion_y
+float32 imu_quaternion_z
+float32 imu_age_s
