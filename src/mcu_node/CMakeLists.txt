@@ -4,6 +4,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
+find_package(dart_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -24,7 +25,7 @@ set_target_properties(mcu_executable PROPERTIES OUTPUT_NAME mcu_node)
 target_compile_features(mcu_executable PRIVATE cxx_std_20)
 target_compile_options(mcu_executable PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(mcu_executable gimbal_protocol "${typesupport}")
-ament_target_dependencies(mcu_executable diagnostic_msgs rclcpp)
+ament_target_dependencies(mcu_executable dart_interfaces diagnostic_msgs rclcpp)
 install(TARGETS gimbal_protocol mcu_executable
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)

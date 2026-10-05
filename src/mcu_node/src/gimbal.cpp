@@ -21,10 +21,19 @@ McuNode::McuNode()
   diagnostics_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
     "/diagnostics", rclcpp::QoS(10).reliable());
   publish_raw_ = declare_parameter<bool>("publish_raw", false);
+  protocol_mode_ = declare_parameter<std::string>("protocol_mode", "gimbal_legacy");
+  actuator_output_enabled_ = declare_parameter<bool>("actuator_output_enabled", false);
   const double diagnostic_period_s = declare_parameter<double>("diagnostic_period_s", 1.0);
   tx_stale_after_s_ = declare_parameter<double>("tx_stale_after_s", 2.0);
   if (diagnostic_period_s <= 0.0 || tx_stale_after_s_ <= 0.0) {
     throw std::invalid_argument("diagnostic_period_s and tx_stale_after_s must be positive");
+  }
+  if (protocol_mode_ != "gimbal_legacy" && protocol_mode_ != "dart_fin_v1") {
+    throw std::invalid_argument("protocol_mode must be gimbal_legacy or dart_fin_v1");
+  }
+  if (protocol_mode_ == "dart_fin_v1" && actuator_output_enabled_) {
+    throw std::invalid_argument(
+            "dart_fin_v1 is framework-only until its MCU wire layout has golden-frame tests");
   }
   rx_raw_pub_ = create_publisher<mcu_node::msg::RawFrame>(
     "/mcu_node/raw/rx", qos);
@@ -53,10 +62,17 @@ McuNode::McuNode()
           get_logger(), *get_clock(), 1000, "serial transmit failed: %s", e.what());
       }
     });
+  fin_command_sub_ = create_subscription<dart_interfaces::msg::FinCommand>(
+    "/mcu_node/fin_command", qos,
+    [this](const dart_interfaces::msg::FinCommand &) {
+      ++fin_commands_received_;
+      // Do not serialize a guessed servo frame. dart_fin_v1 remains receive-only during
+      // the framework phase; enabling its output is rejected above.
+    });
   diagnostics_timer_ = create_wall_timer(
     std::chrono::duration<double>(diagnostic_period_s), [this] {publish_diagnostics();});
   read_thread_ = std::thread([this] {read_loop();});
-  RCLCPP_INFO(get_logger(), "mcu_node started: gimbal protocol, 115200 8N1");
+  RCLCPP_INFO(get_logger(), "mcu_node started: protocol=%s, 115200 8N1", protocol_mode_.c_str());
 }
 
 void McuNode::publish_diagnostics()
@@ -102,6 +118,7 @@ void McuNode::publish_diagnostics()
     metric("commands_received", commands_received_),
     metric("tx_succeeded", tx_succeeded_),
     metric("tx_failed", tx_failed_),
+    metric("fin_commands_received", fin_commands_received_),
     metric("last_command_age_s", age(last_command_)),
     metric("last_tx_success_age_s", success_age),
     metric("last_tx_failure_age_s", age(last_tx_failure_)),
@@ -193,4 +210,3 @@ void McuNode::read_loop()
   }
 }
 }  // namespace mcu_node
-

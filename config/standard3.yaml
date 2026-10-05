@@ -66,10 +66,25 @@ mcu_node:
     publish_raw: false
     diagnostic_period_s: 1.0
     tx_stale_after_s: 2.0
+    protocol_mode: gimbal_legacy  # gimbal_legacy | dart_fin_v1 (framework only)
+    actuator_output_enabled: false
 
 estimate_node:
   ros__parameters:
     detection_topic: /detect_node/detection
     imu_topic: /mcu_node/message/rx
     max_imu_age_s: 0.05
+    prediction:
+      model: static  # static | sinusoidal_velocity
+      horizon_s: 0.0
     diagnostic_period_s: 1.0
+
+aimer_node:
+  ros__parameters:
+    target_topic: /estimate_node/target_state
+    control_rate_hz: 100.0
+    model:
+      controller: pid  # pid | mpc (reserved; selecting mpc fails safely)
+      airframe: four_independent  # four_independent | diagonal_coupled | fixed_movable
+    safety:
+      output_enabled: false

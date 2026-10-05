@@ -21,6 +21,7 @@ def generate_launch_description():
             DeclareLaunchArgument("detect", default_value="true"),
             DeclareLaunchArgument("mcu", default_value="true"),
             DeclareLaunchArgument("estimate", default_value="true"),
+            DeclareLaunchArgument("aimer", default_value="true"),
             Node(
                 package="camera_node",
                 executable="camera_node",
@@ -52,6 +53,14 @@ def generate_launch_description():
                 output="screen",
                 parameters=[config],
                 condition=IfCondition(LaunchConfiguration("estimate")),
+            ),
+            Node(
+                package="aimer_node",
+                executable="aimer_node",
+                name="aimer_node",
+                output="screen",
+                parameters=[config],
+                condition=IfCondition(LaunchConfiguration("aimer")),
             ),
         ]
     )

@@ -7,6 +7,9 @@ find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GreenLight.msg"
+  "msg/TargetState.msg"
+  "msg/GuidanceCommand.msg"
+  "msg/FinCommand.msg"
   DEPENDENCIES std_msgs)
 
 ament_export_dependencies(rosidl_default_runtime)
