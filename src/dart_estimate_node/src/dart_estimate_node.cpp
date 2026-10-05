@@ -37,6 +37,15 @@ bool finite_quaternion(const mcu_node::msg::Rx & message)
     message.imu_quat_z * message.imu_quat_z;
   return std::isfinite(norm_squared) && norm_squared > 1.0e-8;
 }
+
+double quaternion_norm(const mcu_node::msg::Rx & message)
+{
+  return std::sqrt(
+    message.imu_quat_w * message.imu_quat_w +
+    message.imu_quat_x * message.imu_quat_x +
+    message.imu_quat_y * message.imu_quat_y +
+    message.imu_quat_z * message.imu_quat_z);
+}
 }  // namespace
 
 class DartEstimateNode final : public rclcpp::Node
@@ -120,6 +129,16 @@ private:
       output.imu_valid = age <= max_imu_age_s_ && finite_quaternion(*imu);
       output.imu_roll_raw = imu->imu_roll;
       output.imu_roll_velocity_raw = imu->imu_roll_vel;
+      if (output.imu_valid) {
+        const auto norm = quaternion_norm(*imu);
+        output.imu_quaternion_valid = std::isfinite(norm) && norm > 1.0e-8;
+        if (output.imu_quaternion_valid) {
+          output.imu_quaternion_w = static_cast<float>(imu->imu_quat_w / norm);
+          output.imu_quaternion_x = static_cast<float>(imu->imu_quat_x / norm);
+          output.imu_quaternion_y = static_cast<float>(imu->imu_quat_y / norm);
+          output.imu_quaternion_z = static_cast<float>(imu->imu_quat_z / norm);
+        }
+      }
     }
     output.valid = output.target_detected && output.imu_valid;
     estimate_pub_->publish(output);

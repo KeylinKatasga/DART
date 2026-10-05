@@ -7,6 +7,7 @@ bool valid
 bool target_detected
 bool imu_valid
 bool imu_units_verified
+bool imu_quaternion_valid
 float32 imu_age_s
 uint8 motion_model
 float32 prediction_horizon_s
@@ -22,3 +23,7 @@ float32 radius_px
 float32 model_confidence
 float32 imu_roll_raw
 float32 imu_roll_velocity_raw
+float32 imu_quaternion_w
+float32 imu_quaternion_x
+float32 imu_quaternion_y
+float32 imu_quaternion_z

@@ -2,6 +2,8 @@ std_msgs/Header header
 uint64 sequence
 bool valid
 bool output_enabled
+float32 body_roll_rad
+float32 target_winding_rad
 float32 attack_error_rad
 float32 roll_error_rad
 float32 attack_control

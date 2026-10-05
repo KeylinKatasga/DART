@@ -83,8 +83,17 @@ dart_calculate_node:
   ros__parameters:
     target_topic: /dart_estimate_node/target_state
     control_rate_hz: 100.0
+    target_timeout_s: 0.1
     model:
       controller: pid  # pid | mpc (reserved; selecting mpc fails safely)
       airframe: four_independent  # four_independent | diagonal_coupled | fixed_movable
     safety:
       output_enabled: false
+    attitude:
+      # Hamilton quaternion order is w,x,y,z. Positive winding follows atan2(bearing_y,bearing_x).
+      winding_offset_rad: 0.0
+      minimum_attack_rad: 0.001
+      attack_gain: 1.0
+      winding_gain: 1.0
+      attack_control_limit: 0.35
+      winding_control_limit: 0.35
