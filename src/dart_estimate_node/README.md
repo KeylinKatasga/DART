@@ -1,7 +1,7 @@
-# estimate_node
+# dart_estimate_node
 
 订阅 `/detect_node/detection` 与 `/mcu_node/message/rx`，发布
-`/estimate_node/target`。当前阶段完成时间邻近性检查并把绿灯视线观测与最近 MCU IMU
+`/dart_estimate_node/target_state`。当前阶段完成时间邻近性检查并把绿灯视线观测与最近 MCU IMU
 样本组合为一个结构化消息。
 
 MCU 协议桥保持线上数值原样，固件的角速度/角加速度单位与轴向尚未在 DART 实机记录中

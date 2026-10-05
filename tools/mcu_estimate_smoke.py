@@ -12,8 +12,7 @@ import tty
 
 import rclpy
 from ament_index_python.packages import get_package_prefix
-from dart_interfaces.msg import GreenLight
-from estimate_node.msg import TargetEstimate
+from dart_interfaces.msg import GreenLight, TargetState
 from mcu_node.msg import Rx
 
 
@@ -50,8 +49,8 @@ def main() -> int:
             Rx, "/mcu_node/message/rx", lambda message: received.__setitem__("rx", message), 100
         ),
         node.create_subscription(
-            TargetEstimate,
-            "/estimate_node/target",
+            TargetState,
+            "/dart_estimate_node/target_state",
             lambda message: received.__setitem__("estimate", message),
             100,
         ),
@@ -92,13 +91,13 @@ def main() -> int:
                 f"device:={os.ttyname(slave)}",
             ]
         ),
-        subprocess.Popen([executable("estimate_node", "estimate_node")]),
+        subprocess.Popen([executable("dart_estimate_node", "dart_estimate_node")]),
     ]
     try:
         deadline = time.monotonic() + 8.0
         while time.monotonic() < deadline and received["estimate"] is None:
             if any(process.poll() is not None for process in processes):
-                raise RuntimeError("mcu_node or estimate_node exited early")
+                raise RuntimeError("mcu_node or dart_estimate_node exited early")
             os.write(master, frame)
             rclpy.spin_once(node, timeout_sec=0.02)
             if received["rx"] is not None and detection_publisher.get_subscription_count():
@@ -121,16 +120,14 @@ def main() -> int:
         rx = received["rx"]
         estimate = received["estimate"]
         assert rx is not None, "no decoded MCU Rx message"
-        assert estimate is not None, "no TargetEstimate message"
+        assert estimate is not None, "no TargetState message"
         assert rx.imu_yaw == 12.5 and rx.device_sample_time_us == 123456
         assert estimate.valid and estimate.imu_valid and estimate.target_detected
-        assert estimate.imu_yaw_raw == 12.5
-        assert estimate.imu_quaternion_w == 1.0
-        assert estimate.detection_sequence == 7
+        assert estimate.sequence == 7
         assert not estimate.imu_units_verified
         print(
             "PASS: MCU frame decoded and estimate published; "
-            f"rx_sequence={rx.sequence} imu_yaw_raw={estimate.imu_yaw_raw} "
+            f"rx_sequence={rx.sequence} imu_roll_raw={estimate.imu_roll_raw} "
             f"imu_age_s={estimate.imu_age_s:.6f}"
         )
         return 0

@@ -16,7 +16,7 @@
 #include "mcu_node/msg/rx.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-namespace estimate_node
+namespace dart_estimate_node
 {
 namespace
 {
@@ -39,10 +39,10 @@ bool finite_quaternion(const mcu_node::msg::Rx & message)
 }
 }  // namespace
 
-class EstimateNode final : public rclcpp::Node
+class DartEstimateNode final : public rclcpp::Node
 {
 public:
-  EstimateNode() : Node("estimate_node")
+  DartEstimateNode() : Node("dart_estimate_node")
   {
     detection_topic_ = declare_parameter<std::string>(
       "detection_topic", "/detect_node/detection");
@@ -54,7 +54,7 @@ public:
     if (detection_topic_.empty() || imu_topic_.empty() || max_imu_age_s_ <= 0.0 ||
       diagnostic_period_s <= 0.0)
     {
-      throw std::invalid_argument("invalid estimate_node configuration");
+      throw std::invalid_argument("invalid dart_estimate_node configuration");
     }
     if (prediction_model_ != "static" && prediction_model_ != "sinusoidal_velocity") {
       throw std::invalid_argument("prediction.model must be static or sinusoidal_velocity");
@@ -77,7 +77,7 @@ public:
     diagnostics_timer_ = create_wall_timer(
       std::chrono::duration<double>(diagnostic_period_s), [this] {publish_diagnostics();});
     RCLCPP_INFO(
-      get_logger(), "started: detection=%s imu=%s output=/estimate_node/target_state",
+      get_logger(), "started: detection=%s imu=%s output=/dart_estimate_node/target_state",
       detection_topic_.c_str(), imu_topic_.c_str());
   }
 
@@ -133,7 +133,7 @@ private:
   void publish_diagnostics()
   {
     diagnostic_msgs::msg::DiagnosticStatus status;
-    status.name = "estimate_node/status";
+    status.name = "dart_estimate_node/status";
     status.hardware_id = "green_light_mcu_observation";
     if (!last_target_detected_) {
       status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
@@ -176,12 +176,12 @@ private:
   bool last_imu_valid_{false};
   double last_imu_age_s_{-1.0};
 };
-}  // namespace estimate_node
+}  // namespace dart_estimate_node
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<estimate_node::EstimateNode>());
+  rclcpp::spin(std::make_shared<dart_estimate_node::DartEstimateNode>());
   rclcpp::shutdown();
   return 0;
 }

@@ -6,7 +6,7 @@
 #include <string>
 #include <utility>
 
-namespace aimer_node
+namespace dart_calculate_node
 {
 enum class AirframeModel {four_independent, diagonal_coupled, fixed_movable};
 
@@ -62,4 +62,4 @@ public:
 private:
   FinAllocatorConfig config_;
 };
-}  // namespace aimer_node
+}  // namespace dart_calculate_node

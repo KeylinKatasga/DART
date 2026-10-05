@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>estimate_node</name>
+  <name>dart_estimate_node</name>
   <version>0.1.0</version>
   <description>Time-near green-light and MCU IMU observation adapter.</description>
   <maintainer email="2101276189@qq.com">littlehornet</maintainer>

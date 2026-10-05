@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "aimer_node/fin_allocator.hpp"
+#include "dart_calculate_node/fin_allocator.hpp"
 #include "dart_interfaces/msg/fin_command.hpp"
 #include "dart_interfaces/msg/guidance_command.hpp"
 #include "dart_interfaces/msg/target_state.hpp"
@@ -11,14 +11,14 @@
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "rclcpp/rclcpp.hpp"
 
-namespace aimer_node
+namespace dart_calculate_node
 {
-class AimerNode final : public rclcpp::Node
+class DartCalculateNode final : public rclcpp::Node
 {
 public:
-  AimerNode() : Node("aimer_node")
+  DartCalculateNode() : Node("dart_calculate_node")
   {
-    target_topic_ = declare_parameter<std::string>("target_topic", "/estimate_node/target_state");
+    target_topic_ = declare_parameter<std::string>("target_topic", "/dart_estimate_node/target_state");
     const auto airframe = declare_parameter<std::string>("model.airframe", "four_independent");
     controller_ = declare_parameter<std::string>("model.controller", "pid");
     output_enabled_ = declare_parameter<bool>("safety.output_enabled", false);
@@ -29,7 +29,7 @@ public:
     if (controller_ == "mpc") {
       throw std::invalid_argument("MPC is reserved by the framework and is not implemented yet");
     }
-    if (rate_hz <= 0.0 || target_topic_.empty()) {throw std::invalid_argument("invalid aimer_node configuration");}
+    if (rate_hz <= 0.0 || target_topic_.empty()) {throw std::invalid_argument("invalid dart_calculate_node configuration");}
     FinAllocatorConfig config;
     config.model = parse_airframe_model(airframe);
     allocator_ = std::make_unique<FinAllocator>(config);
@@ -72,7 +72,7 @@ private:
   void publish_diagnostics()
   {
     diagnostic_msgs::msg::DiagnosticStatus status;
-    status.name = "aimer_node/status";
+    status.name = "dart_calculate_node/status";
     status.hardware_id = "dart_fin_framework";
     status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
     status.message = output_enabled_ ? "framework_neutral_only" : "output_disabled";
@@ -95,12 +95,12 @@ private:
   rclcpp::TimerBase::SharedPtr control_timer_;
   rclcpp::TimerBase::SharedPtr diagnostics_timer_;
 };
-}  // namespace aimer_node
+}  // namespace dart_calculate_node
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<aimer_node::AimerNode>());
+  rclcpp::spin(std::make_shared<dart_calculate_node::DartCalculateNode>());
   rclcpp::shutdown();
   return 0;
 }

@@ -69,7 +69,7 @@ mcu_node:
     protocol_mode: gimbal_legacy  # gimbal_legacy | dart_fin_v1 (framework only)
     actuator_output_enabled: false
 
-estimate_node:
+dart_estimate_node:
   ros__parameters:
     detection_topic: /detect_node/detection
     imu_topic: /mcu_node/message/rx
@@ -79,9 +79,9 @@ estimate_node:
       horizon_s: 0.0
     diagnostic_period_s: 1.0
 
-aimer_node:
+dart_calculate_node:
   ros__parameters:
-    target_topic: /estimate_node/target_state
+    target_topic: /dart_estimate_node/target_state
     control_rate_hz: 100.0
     model:
       controller: pid  # pid | mpc (reserved; selecting mpc fails safely)

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>aimer_node</name>
+  <name>dart_calculate_node</name>
   <version>0.1.0</version>
   <description>Green-light guidance, control and tail-fin allocation framework for DART.</description>
   <maintainer email="2101276189@qq.com">littlehornet</maintainer>
