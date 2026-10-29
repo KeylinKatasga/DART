@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>dart_coordinate_node</name>
+  <version>0.1.0</version>
+  <description>Pure-bearing camera, body and inertial coordinate conversion for DART.</description>
+  <maintainer email="2101276189@qq.com">littlehornet</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>dart_interfaces</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>mcu_node</depend>
+  <depend>rclcpp</depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

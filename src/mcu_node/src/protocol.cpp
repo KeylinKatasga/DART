@@ -116,5 +116,38 @@ std::optional<ReceivePayload> decode_receive(std::span<const std::uint8_t> frame
   p.system_time_point_us = read_le<std::uint64_t>(bytes, offset);
   return p;
 }
-}  // namespace mcu_node
 
+std::vector<std::uint8_t> encode_dart_fin(const DartSendPayload & p)
+{
+  std::vector<std::uint8_t> payload;
+  payload.reserve(kDartSendPayloadSize);
+  append_le(payload, p.angle1);
+  append_le(payload, p.angle2);
+  append_le(payload, p.angle3);
+  append_le(payload, p.angle4);
+  if (payload.size() != kDartSendPayloadSize) {
+    throw std::logic_error("invalid dart fin send payload layout");
+  }
+  return make_frame(payload);
+}
+
+std::optional<DartReceivePayload> decode_dart_receive(
+  const std::span<const std::uint8_t> frame)
+{
+  if (!verify_frame(frame, kDartReceivePayloadSize)) {return std::nullopt;}
+  const auto bytes = frame.subspan(2, kDartReceivePayloadSize);
+  std::size_t offset = 0;
+  DartReceivePayload p;
+  p.imu_quat_w = read_le<float>(bytes, offset);
+  p.imu_quat_x = read_le<float>(bytes, offset);
+  p.imu_quat_y = read_le<float>(bytes, offset);
+  p.imu_quat_z = read_le<float>(bytes, offset);
+  p.vehicle_x_vel = read_le<float>(bytes, offset);
+  p.vehicle_y_vel = read_le<float>(bytes, offset);
+  p.angle1 = read_le<float>(bytes, offset);
+  p.angle2 = read_le<float>(bytes, offset);
+  p.angle3 = read_le<float>(bytes, offset);
+  p.angle4 = read_le<float>(bytes, offset);
+  return p;
+}
+}  // namespace mcu_node

@@ -9,6 +9,7 @@
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>camera_node</exec_depend>
   <exec_depend>dart_calculate_node</exec_depend>
+  <exec_depend>dart_coordinate_node</exec_depend>
   <exec_depend>detect_node</exec_depend>
   <exec_depend>dart_estimate_node</exec_depend>
   <exec_depend>launch</exec_depend>

@@ -41,6 +41,7 @@ private:
   std::uint64_t fin_commands_received_{0};
   rclcpp::Publisher<mcu_node::msg::Rx>::SharedPtr state_pub_;
   rclcpp::Publisher<mcu_node::msg::Tx>::SharedPtr tx_pub_;
+  rclcpp::Publisher<dart_interfaces::msg::FinCommand>::SharedPtr fin_tx_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;
   rclcpp::Publisher<RawFrame>::SharedPtr rx_raw_pub_;
   rclcpp::Publisher<RawFrame>::SharedPtr tx_raw_pub_;

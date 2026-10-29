@@ -91,13 +91,16 @@ def main() -> int:
                 f"device:={os.ttyname(slave)}",
             ]
         ),
+        subprocess.Popen(
+            [executable("dart_coordinate_node", "dart_coordinate_node")]
+        ),
         subprocess.Popen([executable("dart_estimate_node", "dart_estimate_node")]),
     ]
     try:
         deadline = time.monotonic() + 8.0
         while time.monotonic() < deadline and received["estimate"] is None:
             if any(process.poll() is not None for process in processes):
-                raise RuntimeError("mcu_node or dart_estimate_node exited early")
+                raise RuntimeError("MCU, coordinate, or estimate node exited early")
             os.write(master, frame)
             rclpy.spin_once(node, timeout_sec=0.02)
             if received["rx"] is not None and detection_publisher.get_subscription_count():

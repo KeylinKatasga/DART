@@ -10,7 +10,6 @@
   <depend>builtin_interfaces</depend>
   <depend>dart_interfaces</depend>
   <depend>diagnostic_msgs</depend>
-  <depend>mcu_node</depend>
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
   <exec_depend>rosidl_default_runtime</exec_depend>

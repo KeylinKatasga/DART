@@ -66,14 +66,23 @@ mcu_node:
     publish_raw: false
     diagnostic_period_s: 1.0
     tx_stale_after_s: 2.0
-    protocol_mode: gimbal_legacy  # gimbal_legacy | dart_fin_v1 (framework only)
+    protocol_mode: dart_fin_v1  # RX: quaternion, velocity, angle1..4; TX: angle1..4
     actuator_output_enabled: false
 
-dart_estimate_node:
+dart_coordinate_node:
   ros__parameters:
+    solution_mode: bearing_only
     detection_topic: /detect_node/detection
     imu_topic: /mcu_node/message/rx
     max_imu_age_s: 0.05
+    frames:
+      world: world
+      body: dart_body
+    quaternion_semantics: body_to_world_hamilton_wxyz
+
+dart_estimate_node:
+  ros__parameters:
+    observation_topic: /dart_coordinate_node/observation
     prediction:
       model: static  # static | sinusoidal_velocity
       horizon_s: 0.0
@@ -97,3 +106,26 @@ dart_calculate_node:
       winding_gain: 1.0
       attack_control_limit: 0.35
       winding_control_limit: 0.35
+    allocation:
+      # Viewed from the tail toward the nose: 1 upper-left, then clockwise 2,3,4.
+      # X-layout rows map [attack_control, winding_control] to angle1..angle4.
+      mixing_matrix: [1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0]
+      neutral_rad: [0.0, 0.0, 0.0, 0.0]
+      direction: [1.0, 1.0, 1.0, 1.0]
+      min_rad: [-0.35, -0.35, -0.35, -0.35]
+      max_rad: [0.35, 0.35, 0.35, 0.35]
+    dynamics:
+      # Calibration placeholders. Keep output_enabled=false until every value is measured.
+      mass_kg: 0.0
+      inertia_diagonal_kg_m2: [0.0, 0.0, 0.0]
+      air_density_kg_m3: 1.225
+      fin_area_m2: [0.0, 0.0, 0.0, 0.0]
+      fin_chord_m: [0.0, 0.0, 0.0, 0.0]
+      # Flattened angle1..angle4 vectors, each in body x,y,z order.
+      fin_arm_body_m: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      fin_zero_normal_body: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      fin_hinge_axis_body: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      normal_force_coefficient: [0.0, 0.0, 0.0, 0.0]

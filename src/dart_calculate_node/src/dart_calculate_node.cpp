@@ -1,8 +1,11 @@
 #include <chrono>
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "dart_calculate_node/fin_allocator.hpp"
 #include "dart_calculate_node/attitude_adjuster.hpp"
@@ -15,6 +18,21 @@
 
 namespace dart_calculate_node
 {
+namespace
+{
+template<std::size_t Size>
+std::array<double, Size> array_parameter(
+  rclcpp::Node & node, const std::string & name, const std::array<double, Size> & defaults)
+{
+  const auto values = node.declare_parameter<std::vector<double>>(
+    name, std::vector<double>(defaults.begin(), defaults.end()));
+  if (values.size() != Size) {throw std::invalid_argument(name + " has invalid length");}
+  std::array<double, Size> result{};
+  std::copy(values.begin(), values.end(), result.begin());
+  return result;
+}
+}  // namespace
+
 class DartCalculateNode final : public rclcpp::Node
 {
 public:
@@ -46,6 +64,11 @@ public:
     }
     FinAllocatorConfig config;
     config.model = parse_airframe_model(airframe);
+    config.mixing_matrix = array_parameter(*this, "allocation.mixing_matrix", config.mixing_matrix);
+    config.neutral_rad = array_parameter(*this, "allocation.neutral_rad", config.neutral_rad);
+    config.direction = array_parameter(*this, "allocation.direction", config.direction);
+    config.min_rad = array_parameter(*this, "allocation.min_rad", config.min_rad);
+    config.max_rad = array_parameter(*this, "allocation.max_rad", config.max_rad);
     allocator_ = std::make_unique<FinAllocator>(config);
     const auto qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
     command_pub_ = create_publisher<dart_interfaces::msg::FinCommand>("/mcu_node/fin_command", qos);

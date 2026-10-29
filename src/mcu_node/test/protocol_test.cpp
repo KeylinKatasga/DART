@@ -82,3 +82,38 @@ TEST(Protocol, RejectsCorruptCrc)
   EXPECT_FALSE(mcu_node::verify_frame(wrong_length, 30));
 }
 
+TEST(DartFinProtocol, EncodesFourAnglesInClockwiseOrder)
+{
+  const mcu_node::DartSendPayload payload{1.0F, -2.0F, 3.0F, -4.0F};
+  const auto frame = mcu_node::encode_dart_fin(payload);
+  ASSERT_EQ(frame.size(), 20U);
+  EXPECT_EQ(frame[0], mcu_node::kFrameHead);
+  EXPECT_EQ(frame[1], mcu_node::kDartSendPayloadSize);
+  EXPECT_TRUE(mcu_node::verify_frame(frame, mcu_node::kDartSendPayloadSize));
+  EXPECT_EQ(frame[2], 0x00);
+  EXPECT_EQ(frame[3], 0x00);
+  EXPECT_EQ(frame[4], 0x80);
+  EXPECT_EQ(frame[5], 0x3f);
+}
+
+TEST(DartFinProtocol, DecodesQuaternionVelocityAndFinFeedback)
+{
+  const std::array<float, 10> values{1.0F, 0.1F, 0.2F, 0.3F, 4.0F, -5.0F,
+    0.01F, 0.02F, 0.03F, 0.04F};
+  std::vector<std::uint8_t> frame{
+    mcu_node::kFrameHead, static_cast<std::uint8_t>(mcu_node::kDartReceivePayloadSize)};
+  for (const auto value : values) {
+    const auto bytes = std::bit_cast<std::array<std::uint8_t, 4>>(value);
+    frame.insert(frame.end(), bytes.begin(), bytes.end());
+  }
+  const auto check = mcu_node::crc16(
+    std::span<const std::uint8_t>(frame).subspan(2, mcu_node::kDartReceivePayloadSize));
+  frame.insert(frame.end(), check.begin(), check.end());
+  const auto decoded = mcu_node::decode_dart_receive(frame);
+  ASSERT_TRUE(decoded.has_value());
+  EXPECT_FLOAT_EQ(decoded->imu_quat_w, 1.0F);
+  EXPECT_FLOAT_EQ(decoded->vehicle_x_vel, 4.0F);
+  EXPECT_FLOAT_EQ(decoded->vehicle_y_vel, -5.0F);
+  EXPECT_FLOAT_EQ(decoded->angle1, 0.01F);
+  EXPECT_FLOAT_EQ(decoded->angle4, 0.04F);
+}

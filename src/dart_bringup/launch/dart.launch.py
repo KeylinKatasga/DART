@@ -20,6 +20,7 @@ def generate_launch_description():
             DeclareLaunchArgument("camera", default_value="true"),
             DeclareLaunchArgument("detect", default_value="true"),
             DeclareLaunchArgument("mcu", default_value="true"),
+            DeclareLaunchArgument("dart_coordinate", default_value="true"),
             DeclareLaunchArgument("dart_estimate", default_value="true"),
             DeclareLaunchArgument("dart_calculate", default_value="true"),
             Node(
@@ -45,6 +46,14 @@ def generate_launch_description():
                 output="screen",
                 parameters=[config],
                 condition=IfCondition(LaunchConfiguration("mcu")),
+            ),
+            Node(
+                package="dart_coordinate_node",
+                executable="dart_coordinate_node",
+                name="dart_coordinate_node",
+                output="screen",
+                parameters=[config],
+                condition=IfCondition(LaunchConfiguration("dart_coordinate")),
             ),
             Node(
                 package="dart_estimate_node",

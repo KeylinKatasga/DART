@@ -7,6 +7,7 @@ find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GreenLight.msg"
+  "msg/CoordinateObservation.msg"
   "msg/TargetState.msg"
   "msg/GuidanceCommand.msg"
   "msg/FinCommand.msg"

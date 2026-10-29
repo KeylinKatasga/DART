@@ -27,3 +27,9 @@ float32 imu_quaternion_w
 float32 imu_quaternion_x
 float32 imu_quaternion_y
 float32 imu_quaternion_z
+float32 vehicle_x_vel
+float32 vehicle_y_vel
+float32 angle1
+float32 angle2
+float32 angle3
+float32 angle4

@@ -18,6 +18,8 @@ McuNode::McuNode()
   state_pub_ = create_publisher<mcu_node::msg::Rx>(
     "/mcu_node/message/rx", qos);
   tx_pub_ = create_publisher<mcu_node::msg::Tx>("/mcu_node/message/tx", qos);
+  fin_tx_pub_ = create_publisher<dart_interfaces::msg::FinCommand>(
+    "/mcu_node/message/fin_tx", qos);
   diagnostics_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
     "/diagnostics", rclcpp::QoS(10).reliable());
   publish_raw_ = declare_parameter<bool>("publish_raw", false);
@@ -31,10 +33,6 @@ McuNode::McuNode()
   if (protocol_mode_ != "gimbal_legacy" && protocol_mode_ != "dart_fin_v1") {
     throw std::invalid_argument("protocol_mode must be gimbal_legacy or dart_fin_v1");
   }
-  if (protocol_mode_ == "dart_fin_v1" && actuator_output_enabled_) {
-    throw std::invalid_argument(
-            "dart_fin_v1 is framework-only until its MCU wire layout has golden-frame tests");
-  }
   rx_raw_pub_ = create_publisher<mcu_node::msg::RawFrame>(
     "/mcu_node/raw/rx", qos);
   tx_raw_pub_ = create_publisher<mcu_node::msg::RawFrame>(
@@ -42,6 +40,7 @@ McuNode::McuNode()
   command_sub_ = create_subscription<mcu_node::msg::Tx>(
     "/mcu_node/command", qos,
     [this](const mcu_node::msg::Tx & msg) {
+      if (protocol_mode_ != "gimbal_legacy") {return;}
       ++commands_received_;
       last_command_ = std::chrono::steady_clock::now();
       try {
@@ -64,10 +63,31 @@ McuNode::McuNode()
     });
   fin_command_sub_ = create_subscription<dart_interfaces::msg::FinCommand>(
     "/mcu_node/fin_command", qos,
-    [this](const dart_interfaces::msg::FinCommand &) {
+    [this](const dart_interfaces::msg::FinCommand & msg) {
       ++fin_commands_received_;
-      // Do not serialize a guessed servo frame. dart_fin_v1 remains receive-only during
-      // the framework phase; enabling its output is rejected above.
+      if (protocol_mode_ != "dart_fin_v1" || !actuator_output_enabled_) {return;}
+      if ((!msg.valid || !msg.armed) && !msg.neutral) {return;}
+      last_command_ = std::chrono::steady_clock::now();
+      try {
+        const DartSendPayload payload{
+          msg.neutral ? 0.0F : msg.deflection_rad[0],
+          msg.neutral ? 0.0F : msg.deflection_rad[1],
+          msg.neutral ? 0.0F : msg.deflection_rad[2],
+          msg.neutral ? 0.0F : msg.deflection_rad[3]};
+        const auto frame = encode_dart_fin(payload);
+        serial_.write_all(frame);
+        publish_raw(frame, mcu_node::msg::RawFrame::TX, tx_raw_pub_);
+        auto sent = msg;
+        sent.header.stamp = now();
+        fin_tx_pub_->publish(sent);
+        ++tx_succeeded_;
+        last_tx_success_ = std::chrono::steady_clock::now();
+      } catch (const std::exception & e) {
+        ++tx_failed_;
+        last_tx_failure_ = std::chrono::steady_clock::now();
+        RCLCPP_ERROR_THROTTLE(
+          get_logger(), *get_clock(), 1000, "dart fin transmit failed: %s", e.what());
+      }
     });
   diagnostics_timer_ = create_wall_timer(
     std::chrono::duration<double>(diagnostic_period_s), [this] {publish_diagnostics();});
@@ -89,14 +109,15 @@ void McuNode::publish_diagnostics()
       return item;
     };
 
-  const auto publisher_count = command_sub_->get_publisher_count();
+  const auto publisher_count = protocol_mode_ == "dart_fin_v1" ?
+    fin_command_sub_->get_publisher_count() : command_sub_->get_publisher_count();
   const auto success_age = age(last_tx_success_);
   const bool latest_event_failed = last_tx_failure_ != std::chrono::steady_clock::time_point{} &&
     (last_tx_success_ == std::chrono::steady_clock::time_point{} ||
     last_tx_failure_ > last_tx_success_);
   diagnostic_msgs::msg::DiagnosticStatus status;
   status.name = "mcu_node/tx";
-  status.hardware_id = "gimbal_serial";
+  status.hardware_id = protocol_mode_ + "_serial";
   if (latest_event_failed) {
     status.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
     status.message = "transmit_failed";
@@ -163,8 +184,50 @@ void McuNode::read_loop()
     try {
       const auto frame = serial_.read_frame();
       publish_raw(frame, RawFrame::RX, rx_raw_pub_);
-      const auto p = decode_receive(frame);
-      if (!p) {
+      mcu_node::msg::Rx msg;
+      msg.stamp = now();
+      msg.sequence = ++sequence_;
+      bool decoded = false;
+      if (protocol_mode_ == "dart_fin_v1") {
+        const auto payload = decode_dart_receive(frame);
+        if (payload) {
+          msg.imu_quat_w = payload->imu_quat_w;
+          msg.imu_quat_x = payload->imu_quat_x;
+          msg.imu_quat_y = payload->imu_quat_y;
+          msg.imu_quat_z = payload->imu_quat_z;
+          msg.vehicle_x_vel = payload->vehicle_x_vel;
+          msg.vehicle_y_vel = payload->vehicle_y_vel;
+          msg.angle1 = payload->angle1;
+          msg.angle2 = payload->angle2;
+          msg.angle3 = payload->angle3;
+          msg.angle4 = payload->angle4;
+          decoded = true;
+        }
+      } else {
+        const auto payload = decode_receive(frame);
+        if (payload) {
+          msg.device_sample_time_us = payload->system_time_point_us;
+          msg.imu_yaw = payload->imu_yaw;
+          msg.imu_pitch = payload->imu_pitch;
+          msg.imu_roll = payload->imu_roll;
+          msg.imu_yaw_vel = payload->imu_yaw_vel;
+          msg.imu_pitch_vel = payload->imu_pitch_vel;
+          msg.imu_roll_vel = payload->imu_roll_vel;
+          msg.imu_yaw_acc = payload->imu_yaw_acc;
+          msg.imu_pitch_acc = payload->imu_pitch_acc;
+          msg.imu_roll_acc = payload->imu_roll_acc;
+          msg.imu_quat_w = payload->imu_quat_w;
+          msg.imu_quat_x = payload->imu_quat_x;
+          msg.imu_quat_y = payload->imu_quat_y;
+          msg.imu_quat_z = payload->imu_quat_z;
+          msg.order = payload->order;
+          msg.remaining_time_s = payload->remaining_time_s;
+          msg.sentry_behavior_mode = payload->sentry_behavior_mode;
+          msg.colour = payload->colour;
+          decoded = true;
+        }
+      }
+      if (!decoded) {
         const auto payload_size = frame.size() >= 4 ? frame.size() - 4 : 0;
         const auto expected = frame.size() >= 4 ?
           crc16(std::span<const std::uint8_t>(frame).subspan(2, payload_size)) :
@@ -178,27 +241,6 @@ void McuNode::read_loop()
           hex(frame).c_str());
         continue;
       }
-      mcu_node::msg::Rx msg;
-      msg.stamp = now();
-      msg.sequence = ++sequence_;
-      msg.device_sample_time_us = p->system_time_point_us;
-      msg.imu_yaw = p->imu_yaw;
-      msg.imu_pitch = p->imu_pitch;
-      msg.imu_roll = p->imu_roll;
-      msg.imu_yaw_vel = p->imu_yaw_vel;
-      msg.imu_pitch_vel = p->imu_pitch_vel;
-      msg.imu_roll_vel = p->imu_roll_vel;
-      msg.imu_yaw_acc = p->imu_yaw_acc;
-      msg.imu_pitch_acc = p->imu_pitch_acc;
-      msg.imu_roll_acc = p->imu_roll_acc;
-      msg.imu_quat_w = p->imu_quat_w;
-      msg.imu_quat_x = p->imu_quat_x;
-      msg.imu_quat_y = p->imu_quat_y;
-      msg.imu_quat_z = p->imu_quat_z;
-      msg.order = p->order;
-      msg.remaining_time_s = p->remaining_time_s;
-      msg.sentry_behavior_mode = p->sentry_behavior_mode;
-      msg.colour = p->colour;
       state_pub_->publish(msg);
     } catch (const std::exception & e) {
       if (running_) {

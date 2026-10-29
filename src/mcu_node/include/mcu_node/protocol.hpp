@@ -12,6 +12,8 @@ namespace mcu_node
 constexpr std::uint8_t kFrameHead = 0x3e;
 constexpr std::size_t kReceivePayloadSize = 66;
 constexpr std::size_t kSendPayloadSize = 30;
+constexpr std::size_t kDartReceivePayloadSize = 40;
+constexpr std::size_t kDartSendPayloadSize = 16;
 
 struct ReceivePayload
 {
@@ -48,9 +50,33 @@ struct SendPayload
   std::int32_t autoaim_living_waterfall_flag{};
 };
 
+struct DartReceivePayload
+{
+  float imu_quat_w{};
+  float imu_quat_x{};
+  float imu_quat_y{};
+  float imu_quat_z{};
+  float vehicle_x_vel{};
+  float vehicle_y_vel{};
+  float angle1{};
+  float angle2{};
+  float angle3{};
+  float angle4{};
+};
+
+struct DartSendPayload
+{
+  float angle1{};
+  float angle2{};
+  float angle3{};
+  float angle4{};
+};
+
 std::array<std::uint8_t, 2> crc16(std::span<const std::uint8_t> payload);
 bool verify_frame(std::span<const std::uint8_t> frame, std::size_t expected_payload_size);
 std::vector<std::uint8_t> encode(const SendPayload & payload);
 std::optional<ReceivePayload> decode_receive(std::span<const std::uint8_t> frame);
+std::vector<std::uint8_t> encode_dart_fin(const DartSendPayload & payload);
+std::optional<DartReceivePayload> decode_dart_receive(
+  std::span<const std::uint8_t> frame);
 }  // namespace mcu_node
-
