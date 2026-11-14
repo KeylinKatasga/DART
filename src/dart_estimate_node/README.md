@@ -1,9 +1,9 @@
 # dart_estimate_node
 
-订阅 `/detect_node/detection` 与 `/mcu_node/message/rx`，发布
-`/dart_estimate_node/target_state`。当前阶段完成时间邻近性检查并把绿灯视线观测与最近 MCU IMU
-样本组合为一个结构化消息。
+订阅 `/dart_coordinate_node/observation`，发布 `/dart_estimate_node/target_state`。
+当坐标节点提供三维位置时，节点使用 9 维 Singer 模型估计目标位置、速度和加速度，并支持
+预测时域、过程噪声、量测噪声和马氏距离门限配置。没有三维位置时仍保留纯方位字段，供
+降级链路使用。
 
-MCU 协议桥保持线上数值原样，固件的角速度/角加速度单位与轴向尚未在 DART 实机记录中
-确认，因此 `imu_units_verified=false`，本节点不会擅自做单位换算或视线去旋转。完成固件
-约定核验后，才可在这里加入 IMU 稳像与滤波。
+自身姿态与角速度不在本节点估计，由 `dart_self_estimate_node` 的 7 维刚体 EKF 独立完成。
+两套滤波器分离，避免把目标机动噪声与飞镖气动模型耦合到同一协方差中。

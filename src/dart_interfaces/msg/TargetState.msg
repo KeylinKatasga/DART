@@ -1,5 +1,6 @@
 uint8 MOTION_STATIC=0
 uint8 MOTION_SINUSOIDAL_VELOCITY=1
+uint8 MOTION_SINGER=2
 
 std_msgs/Header header
 uint64 sequence
@@ -21,6 +22,11 @@ float32 predicted_bearing_rate_x_rad_s
 float32 predicted_bearing_rate_y_rad_s
 float32 radius_px
 float32 model_confidence
+bool position_valid
+float32[3] position_world_m
+float32[3] velocity_world_m_s
+float32[3] acceleration_world_m_s2
+float32[9] position_covariance
 float32 imu_roll_raw
 float32 imu_roll_velocity_raw
 float32 imu_quaternion_w

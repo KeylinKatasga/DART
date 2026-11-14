@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cmath>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -11,6 +12,7 @@
 #include "dart_calculate_node/attitude_adjuster.hpp"
 #include "dart_interfaces/msg/fin_command.hpp"
 #include "dart_interfaces/msg/guidance_command.hpp"
+#include "dart_interfaces/msg/self_state.hpp"
 #include "dart_interfaces/msg/target_state.hpp"
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
@@ -39,6 +41,8 @@ public:
   DartCalculateNode() : Node("dart_calculate_node")
   {
     target_topic_ = declare_parameter<std::string>("target_topic", "/dart_estimate_node/target_state");
+    self_state_topic_ = declare_parameter<std::string>(
+      "self_state_topic", "/dart_self_estimate_node/state");
     const auto airframe = declare_parameter<std::string>("model.airframe", "four_independent");
     controller_ = declare_parameter<std::string>("model.controller", "pid");
     output_enabled_ = declare_parameter<bool>("safety.output_enabled", false);
@@ -79,6 +83,10 @@ public:
         latest_target_ = std::move(message);
         last_target_received_ = std::chrono::steady_clock::now();
       });
+    self_state_sub_ = create_subscription<dart_interfaces::msg::SelfState>(
+      self_state_topic_, qos, [this](dart_interfaces::msg::SelfState::ConstSharedPtr message) {
+        latest_self_state_ = std::move(message);
+      });
     control_timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / rate_hz), [this] {control_tick();});
     diagnostics_timer_ = create_wall_timer(std::chrono::seconds(1), [this] {publish_diagnostics();});
@@ -102,13 +110,40 @@ private:
       last_target_received_ != std::chrono::steady_clock::time_point{} &&
       std::chrono::duration<double>(
         std::chrono::steady_clock::now() - last_target_received_).count() <= target_timeout_s_;
-    if (target_fresh && latest_target_->valid && latest_target_->imu_quaternion_valid) {
-      const Quaternion quaternion{
+    const bool self_valid = latest_self_state_ && latest_self_state_->initialized;
+    if (target_fresh && latest_target_->valid &&
+      (self_valid || latest_target_->imu_quaternion_valid))
+    {
+      const Quaternion quaternion = self_valid ? Quaternion{
+        latest_self_state_->quaternion_w, latest_self_state_->quaternion_x,
+        latest_self_state_->quaternion_y, latest_self_state_->quaternion_z} : Quaternion{
         latest_target_->imu_quaternion_w, latest_target_->imu_quaternion_x,
         latest_target_->imu_quaternion_y, latest_target_->imu_quaternion_z};
+      double bearing_x = latest_target_->predicted_bearing_x_rad;
+      double bearing_y = latest_target_->predicted_bearing_y_rad;
+      if (self_valid && latest_target_->position_valid) {
+        const double w = quaternion.w;
+        const double x = quaternion.x;
+        const double y = quaternion.y;
+        const double z = quaternion.z;
+        const double world_x = latest_target_->position_world_m[0];
+        const double world_y = latest_target_->position_world_m[1];
+        const double world_z = latest_target_->position_world_m[2];
+        const double body_x = (1.0 - 2.0 * (y * y + z * z)) * world_x +
+          2.0 * (x * y + z * w) * world_y + 2.0 * (x * z - y * w) * world_z;
+        const double body_y = 2.0 * (x * y - z * w) * world_x +
+          (1.0 - 2.0 * (x * x + z * z)) * world_y +
+          2.0 * (y * z + x * w) * world_z;
+        const double body_z = 2.0 * (x * z + y * w) * world_x +
+          2.0 * (y * z - x * w) * world_y +
+          (1.0 - 2.0 * (x * x + y * y)) * world_z;
+        if (body_x > 1e-6) {
+          bearing_x = std::atan2(-body_z, body_x);
+          bearing_y = std::atan2(body_y, body_x);
+        }
+      }
       const auto adjustment = calculate_attitude_adjustment(
-        latest_target_->predicted_bearing_x_rad, latest_target_->predicted_bearing_y_rad,
-        quaternion, winding_offset_rad_, minimum_attack_rad_);
+        bearing_x, bearing_y, quaternion, winding_offset_rad_, minimum_attack_rad_);
       guidance.valid = adjustment.valid;
       guidance.body_roll_rad = static_cast<float>(adjustment.body_roll_rad);
       guidance.target_winding_rad = static_cast<float>(adjustment.target_winding_rad);
@@ -151,6 +186,7 @@ private:
   }
 
   std::string target_topic_;
+  std::string self_state_topic_;
   std::string controller_;
   bool output_enabled_{false};
   double target_timeout_s_{0.1};
@@ -163,8 +199,10 @@ private:
   std::uint64_t sequence_{0};
   std::unique_ptr<FinAllocator> allocator_;
   dart_interfaces::msg::TargetState::ConstSharedPtr latest_target_;
+  dart_interfaces::msg::SelfState::ConstSharedPtr latest_self_state_;
   std::chrono::steady_clock::time_point last_target_received_{};
   rclcpp::Subscription<dart_interfaces::msg::TargetState>::SharedPtr target_sub_;
+  rclcpp::Subscription<dart_interfaces::msg::SelfState>::SharedPtr self_state_sub_;
   rclcpp::Publisher<dart_interfaces::msg::FinCommand>::SharedPtr command_pub_;
   rclcpp::Publisher<dart_interfaces::msg::GuidanceCommand>::SharedPtr guidance_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;

@@ -71,9 +71,14 @@ mcu_node:
 
 dart_coordinate_node:
   ros__parameters:
-    solution_mode: bearing_only
+    # known_circle_pnp assumes the light is a planar circle facing the camera. Replace the
+    # placeholder diameter with the measured emitting diameter before evaluating range.
+    solution_mode: known_circle_pnp  # known_circle_pnp | bearing_only
     detection_topic: /detect_node/detection
+    camera_info_topic: /camera_node/camera_info
     imu_topic: /mcu_node/message/rx
+    target_diameter_m: 0.1
+    max_reprojection_error_px: 3.0
     max_imu_age_s: 0.05
     frames:
       world: world
@@ -84,13 +89,51 @@ dart_estimate_node:
   ros__parameters:
     observation_topic: /dart_coordinate_node/observation
     prediction:
-      model: static  # static | sinusoidal_velocity
-      horizon_s: 0.0
+      model: singer  # singer | static | sinusoidal_velocity
+      horizon_s: 0.1
+    singer:
+      tau_s: 0.5
+      acceleration_spectral_density: 1.0
+      position_variance: 0.01
+      initial_position_variance: 0.25
+      initial_velocity_variance: 4.0
+      initial_acceleration_variance: 16.0
+      mahalanobis_limit: 16.27
     diagnostic_period_s: 1.0
+
+dart_self_estimate_node:
+  ros__parameters:
+    # The current dart_fin_v1 byte frame has quaternion and fin feedback but no raw accel/gyro.
+    # Feed a standard sensor_msgs/Imu source here when the MCU bridge publishes it.
+    imu_topic: /imu/data
+    fin_feedback_topic: /mcu_node/message/rx
+    dynamics:
+      # Safe numerical placeholders only; actuator output remains disabled below.
+      mass_kg: 1.0
+      inertia_diagonal_kg_m2: [1.0, 1.0, 1.0]
+      moment_allocation: [0.0, 0.0, 0.0, 0.0,
+                          0.0, 0.0, 0.0, 0.0,
+                          0.0, 0.0, 0.0, 0.0]
+      force_allocation: [0.0, 0.0, 0.0, 0.0,
+                         0.0, 0.0, 0.0, 0.0,
+                         0.0, 0.0, 0.0, 0.0]
+      moment_bias_nm: [0.0, 0.0, 0.0]
+      force_bias_n: [0.0, 0.0, 0.0]
+    measurement:
+      # true means the supplied acceleration is modelled as F_aero/m + R(q)^T g.
+      include_gravity_projection: true
+      gravity_world_m_s2: [0.0, 0.0, -9.80665]
+    noise:
+      quaternion_process_variance: 1.0e-6
+      angular_velocity_process_variance: 1.0e-3
+      accelerometer_variance: 0.25
+      gyroscope_variance: 1.0e-3
+      mahalanobis_limit: 30.0
 
 dart_calculate_node:
   ros__parameters:
     target_topic: /dart_estimate_node/target_state
+    self_state_topic: /dart_self_estimate_node/state
     control_rate_hz: 100.0
     target_timeout_s: 0.1
     model:

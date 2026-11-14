@@ -1,0 +1,13 @@
+std_msgs/Header header
+bool valid
+bool initialized
+float32 dt_s
+float32 quaternion_w
+float32 quaternion_x
+float32 quaternion_y
+float32 quaternion_z
+float32 angular_velocity_x_rad_s
+float32 angular_velocity_y_rad_s
+float32 angular_velocity_z_rad_s
+float32[7] covariance_diagonal
+float32 innovation_mahalanobis

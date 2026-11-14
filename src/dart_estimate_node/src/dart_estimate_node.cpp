@@ -5,6 +5,9 @@
 #include <string>
 #include <utility>
 
+#include <Eigen/Dense>
+
+#include "dart_estimate_node/singer_filter.hpp"
 #include "dart_interfaces/msg/coordinate_observation.hpp"
 #include "dart_interfaces/msg/target_state.hpp"
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
@@ -20,13 +23,29 @@ public:
   {
     observation_topic_ = declare_parameter<std::string>(
       "observation_topic", "/dart_coordinate_node/observation");
-    prediction_model_ = declare_parameter<std::string>("prediction.model", "static");
+    prediction_model_ = declare_parameter<std::string>("prediction.model", "singer");
     prediction_horizon_s_ = declare_parameter<double>("prediction.horizon_s", 0.0);
+    SingerConfig singer_config;
+    singer_config.tau_s = declare_parameter<double>("singer.tau_s", singer_config.tau_s);
+    singer_config.acceleration_spectral_density = declare_parameter<double>(
+      "singer.acceleration_spectral_density", singer_config.acceleration_spectral_density);
+    singer_config.position_variance = declare_parameter<double>(
+      "singer.position_variance", singer_config.position_variance);
+    singer_config.initial_position_variance = declare_parameter<double>(
+      "singer.initial_position_variance", singer_config.initial_position_variance);
+    singer_config.initial_velocity_variance = declare_parameter<double>(
+      "singer.initial_velocity_variance", singer_config.initial_velocity_variance);
+    singer_config.initial_acceleration_variance = declare_parameter<double>(
+      "singer.initial_acceleration_variance", singer_config.initial_acceleration_variance);
+    singer_mahalanobis_limit_ = declare_parameter<double>("singer.mahalanobis_limit", 16.27);
+    singer_filter_ = std::make_unique<SingerFilter>(singer_config);
     if (observation_topic_.empty() || prediction_horizon_s_ < 0.0) {
       throw std::invalid_argument("invalid dart_estimate_node configuration");
     }
-    if (prediction_model_ != "static" && prediction_model_ != "sinusoidal_velocity") {
-      throw std::invalid_argument("prediction.model must be static or sinusoidal_velocity");
+    if (prediction_model_ != "static" && prediction_model_ != "sinusoidal_velocity" &&
+      prediction_model_ != "singer")
+    {
+      throw std::invalid_argument("prediction.model must be static, sinusoidal_velocity or singer");
     }
     const auto qos = rclcpp::QoS(rclcpp::KeepLast(100)).reliable();
     estimate_pub_ = create_publisher<dart_interfaces::msg::TargetState>("~/target_state", qos);
@@ -54,7 +73,9 @@ private:
     output.imu_age_s = observation.imu_age_s;
     output.motion_model = prediction_model_ == "static" ?
       dart_interfaces::msg::TargetState::MOTION_STATIC :
-      dart_interfaces::msg::TargetState::MOTION_SINUSOIDAL_VELOCITY;
+      prediction_model_ == "sinusoidal_velocity" ?
+      dart_interfaces::msg::TargetState::MOTION_SINUSOIDAL_VELOCITY :
+      dart_interfaces::msg::TargetState::MOTION_SINGER;
     output.prediction_horizon_s = static_cast<float>(prediction_horizon_s_);
     output.bearing_x_rad = observation.bearing_x_rad;
     output.bearing_y_rad = observation.bearing_y_rad;
@@ -68,6 +89,42 @@ private:
     output.predicted_bearing_rate_y_rad_s = observation.bearing_rate_y_rad_s;
     output.radius_px = observation.radius_px;
     output.model_confidence = observation.valid ? 1.0F : 0.0F;
+    if (prediction_model_ == "singer" && observation.position_valid) {
+      const Eigen::Vector3d measured_position{
+        observation.position_world_m[0], observation.position_world_m[1],
+        observation.position_world_m[2]};
+      const rclcpp::Time stamp(observation.header.stamp);
+      if (!singer_filter_->initialized()) {
+        singer_filter_->reset(measured_position);
+      } else {
+        const double dt = (stamp - last_position_stamp_).seconds();
+        singer_filter_->predict(dt);
+        if (!singer_filter_->update_position(measured_position, singer_mahalanobis_limit_)) {
+          output.model_confidence = 0.0F;
+        }
+      }
+      last_position_stamp_ = stamp;
+      output.position_valid = singer_filter_->initialized();
+      const auto & state = singer_filter_->state();
+      const auto predicted = singer_filter_->predicted_position(prediction_horizon_s_);
+      output.position_world_m = {
+        static_cast<float>(predicted.x()), static_cast<float>(predicted.y()),
+        static_cast<float>(predicted.z())};
+      output.velocity_world_m_s = {
+        static_cast<float>(state[3]), static_cast<float>(state[4]), static_cast<float>(state[5])};
+      output.acceleration_world_m_s2 = {
+        static_cast<float>(state[6]), static_cast<float>(state[7]), static_cast<float>(state[8])};
+      const auto position_covariance = singer_filter_->covariance().block<3, 3>(0, 0);
+      for (int row = 0; row < 3; ++row) {
+        for (int column = 0; column < 3; ++column) {
+          output.position_covariance[row * 3 + column] =
+            static_cast<float>(position_covariance(row, column));
+        }
+      }
+    } else if (observation.position_valid) {
+      output.position_valid = true;
+      output.position_world_m = observation.position_world_m;
+    }
     output.imu_quaternion_w = observation.imu_quaternion_w;
     output.imu_quaternion_x = observation.imu_quaternion_x;
     output.imu_quaternion_y = observation.imu_quaternion_y;
@@ -100,6 +157,9 @@ private:
   std::string observation_topic_;
   std::string prediction_model_;
   double prediction_horizon_s_{0.0};
+  double singer_mahalanobis_limit_{16.27};
+  std::unique_ptr<SingerFilter> singer_filter_;
+  rclcpp::Time last_position_stamp_{0, 0, RCL_ROS_TIME};
   std::uint64_t observations_{0};
   std::uint64_t valid_estimates_{0};
   bool last_valid_{false};

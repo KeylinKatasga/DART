@@ -9,7 +9,9 @@
   <depend>dart_interfaces</depend>
   <depend>diagnostic_msgs</depend>
   <depend>mcu_node</depend>
+  <depend>opencv</depend>
   <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
   <test_depend>ament_cmake_gtest</test_depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>

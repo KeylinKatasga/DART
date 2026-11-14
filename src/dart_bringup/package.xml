@@ -12,6 +12,7 @@
   <exec_depend>dart_coordinate_node</exec_depend>
   <exec_depend>detect_node</exec_depend>
   <exec_depend>dart_estimate_node</exec_depend>
+  <exec_depend>dart_self_estimate_node</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>mcu_node</exec_depend>

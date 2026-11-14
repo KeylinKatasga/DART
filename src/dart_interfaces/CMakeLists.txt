@@ -9,6 +9,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GreenLight.msg"
   "msg/CoordinateObservation.msg"
   "msg/TargetState.msg"
+  "msg/SelfState.msg"
   "msg/GuidanceCommand.msg"
   "msg/FinCommand.msg"
   DEPENDENCIES std_msgs)

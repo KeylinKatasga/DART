@@ -3,6 +3,7 @@ uint64 sequence
 bool valid
 bool target_detected
 bool imu_valid
+bool position_valid
 float32 imu_age_s
 string body_frame_id
 string world_frame_id
@@ -11,8 +12,13 @@ float32 bearing_y_rad
 float32 bearing_rate_x_rad_s
 float32 bearing_rate_y_rad_s
 float32 radius_px
+float32 range_m
+float32 reprojection_error_px
 float32[3] los_body_unit
 float32[3] los_world_unit
+float32[3] position_camera_m
+float32[3] position_body_m
+float32[3] position_world_m
 float32 imu_quaternion_w
 float32 imu_quaternion_x
 float32 imu_quaternion_y
