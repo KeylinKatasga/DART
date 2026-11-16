@@ -20,8 +20,8 @@ int16 order
 int16 remaining_time_s
 int8 sentry_behavior_mode
 uint8 colour
-# dart_fin_v1 fields. angle1 starts at the upper-left fin and continues clockwise
-# for the X-layout: upper-left, upper-right, lower-right, lower-left.
+# Reserved compatibility fields. They are zero because the simplified MCU RX frame
+# currently carries only the quaternion and match-state fields above.
 float32 vehicle_x_vel
 float32 vehicle_y_vel
 float32 angle1

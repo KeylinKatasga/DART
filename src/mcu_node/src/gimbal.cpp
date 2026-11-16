@@ -23,15 +23,11 @@ McuNode::McuNode()
   diagnostics_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
     "/diagnostics", rclcpp::QoS(10).reliable());
   publish_raw_ = declare_parameter<bool>("publish_raw", false);
-  protocol_mode_ = declare_parameter<std::string>("protocol_mode", "gimbal_legacy");
   actuator_output_enabled_ = declare_parameter<bool>("actuator_output_enabled", false);
   const double diagnostic_period_s = declare_parameter<double>("diagnostic_period_s", 1.0);
   tx_stale_after_s_ = declare_parameter<double>("tx_stale_after_s", 2.0);
   if (diagnostic_period_s <= 0.0 || tx_stale_after_s_ <= 0.0) {
     throw std::invalid_argument("diagnostic_period_s and tx_stale_after_s must be positive");
-  }
-  if (protocol_mode_ != "gimbal_legacy" && protocol_mode_ != "dart_fin_v1") {
-    throw std::invalid_argument("protocol_mode must be gimbal_legacy or dart_fin_v1");
   }
   rx_raw_pub_ = create_publisher<mcu_node::msg::RawFrame>(
     "/mcu_node/raw/rx", qos);
@@ -40,12 +36,13 @@ McuNode::McuNode()
   command_sub_ = create_subscription<mcu_node::msg::Tx>(
     "/mcu_node/command", qos,
     [this](const mcu_node::msg::Tx & msg) {
-      if (protocol_mode_ != "gimbal_legacy") {return;}
       ++commands_received_;
+      if (!actuator_output_enabled_) {return;}
       last_command_ = std::chrono::steady_clock::now();
       try {
-        SendPayload payload{msg.yaw, msg.yaw_vel, msg.yaw_acc, msg.pitch, msg.pitch_vel,
-          msg.pitch_acc, msg.enable_lock, msg.enable_shoot, msg.autoaim_living_waterfall_flag};
+        const SendPayload payload{
+          msg.angle1, msg.angle2, msg.angle3, msg.angle4, msg.enable_lock, msg.enable_shoot,
+          msg.autoaim_living_waterfall_flag};
         const auto frame = encode(payload);
         serial_.write_all(frame);
         publish_raw(frame, mcu_node::msg::RawFrame::TX, tx_raw_pub_);
@@ -65,16 +62,19 @@ McuNode::McuNode()
     "/mcu_node/fin_command", qos,
     [this](const dart_interfaces::msg::FinCommand & msg) {
       ++fin_commands_received_;
-      if (protocol_mode_ != "dart_fin_v1" || !actuator_output_enabled_) {return;}
+      if (!actuator_output_enabled_) {return;}
       if ((!msg.valid || !msg.armed) && !msg.neutral) {return;}
       last_command_ = std::chrono::steady_clock::now();
       try {
-        const DartSendPayload payload{
+        const SendPayload payload{
           msg.neutral ? 0.0F : msg.deflection_rad[0],
           msg.neutral ? 0.0F : msg.deflection_rad[1],
           msg.neutral ? 0.0F : msg.deflection_rad[2],
-          msg.neutral ? 0.0F : msg.deflection_rad[3]};
-        const auto frame = encode_dart_fin(payload);
+          msg.neutral ? 0.0F : msg.deflection_rad[3],
+          static_cast<std::uint8_t>(msg.valid && msg.armed),
+          0U,
+          0};
+        const auto frame = encode(payload);
         serial_.write_all(frame);
         publish_raw(frame, mcu_node::msg::RawFrame::TX, tx_raw_pub_);
         auto sent = msg;
@@ -92,7 +92,9 @@ McuNode::McuNode()
   diagnostics_timer_ = create_wall_timer(
     std::chrono::duration<double>(diagnostic_period_s), [this] {publish_diagnostics();});
   read_thread_ = std::thread([this] {read_loop();});
-  RCLCPP_INFO(get_logger(), "mcu_node started: protocol=%s, 115200 8N1", protocol_mode_.c_str());
+  RCLCPP_INFO(
+    get_logger(), "mcu_node started: RX=%zu bytes, TX=%zu bytes, 115200 8N1",
+    kReceivePayloadSize, kSendPayloadSize);
 }
 
 void McuNode::publish_diagnostics()
@@ -109,15 +111,15 @@ void McuNode::publish_diagnostics()
       return item;
     };
 
-  const auto publisher_count = protocol_mode_ == "dart_fin_v1" ?
-    fin_command_sub_->get_publisher_count() : command_sub_->get_publisher_count();
+  const auto publisher_count =
+    fin_command_sub_->get_publisher_count() + command_sub_->get_publisher_count();
   const auto success_age = age(last_tx_success_);
   const bool latest_event_failed = last_tx_failure_ != std::chrono::steady_clock::time_point{} &&
     (last_tx_success_ == std::chrono::steady_clock::time_point{} ||
     last_tx_failure_ > last_tx_success_);
   diagnostic_msgs::msg::DiagnosticStatus status;
   status.name = "mcu_node/tx";
-  status.hardware_id = protocol_mode_ + "_serial";
+  status.hardware_id = "dart_serial";
   if (latest_event_failed) {
     status.level = diagnostic_msgs::msg::DiagnosticStatus::ERROR;
     status.message = "transmit_failed";
@@ -187,45 +189,18 @@ void McuNode::read_loop()
       mcu_node::msg::Rx msg;
       msg.stamp = now();
       msg.sequence = ++sequence_;
-      bool decoded = false;
-      if (protocol_mode_ == "dart_fin_v1") {
-        const auto payload = decode_dart_receive(frame);
-        if (payload) {
-          msg.imu_quat_w = payload->imu_quat_w;
-          msg.imu_quat_x = payload->imu_quat_x;
-          msg.imu_quat_y = payload->imu_quat_y;
-          msg.imu_quat_z = payload->imu_quat_z;
-          msg.vehicle_x_vel = payload->vehicle_x_vel;
-          msg.vehicle_y_vel = payload->vehicle_y_vel;
-          msg.angle1 = payload->angle1;
-          msg.angle2 = payload->angle2;
-          msg.angle3 = payload->angle3;
-          msg.angle4 = payload->angle4;
-          decoded = true;
-        }
-      } else {
-        const auto payload = decode_receive(frame);
-        if (payload) {
-          msg.device_sample_time_us = payload->system_time_point_us;
-          msg.imu_yaw = payload->imu_yaw;
-          msg.imu_pitch = payload->imu_pitch;
-          msg.imu_roll = payload->imu_roll;
-          msg.imu_yaw_vel = payload->imu_yaw_vel;
-          msg.imu_pitch_vel = payload->imu_pitch_vel;
-          msg.imu_roll_vel = payload->imu_roll_vel;
-          msg.imu_yaw_acc = payload->imu_yaw_acc;
-          msg.imu_pitch_acc = payload->imu_pitch_acc;
-          msg.imu_roll_acc = payload->imu_roll_acc;
-          msg.imu_quat_w = payload->imu_quat_w;
-          msg.imu_quat_x = payload->imu_quat_x;
-          msg.imu_quat_y = payload->imu_quat_y;
-          msg.imu_quat_z = payload->imu_quat_z;
-          msg.order = payload->order;
-          msg.remaining_time_s = payload->remaining_time_s;
-          msg.sentry_behavior_mode = payload->sentry_behavior_mode;
-          msg.colour = payload->colour;
-          decoded = true;
-        }
+      const auto payload = decode_receive(frame);
+      const bool decoded = payload.has_value();
+      if (payload) {
+        msg.device_sample_time_us = payload->system_time_point_us;
+        msg.imu_quat_w = payload->imu_quat_w;
+        msg.imu_quat_x = payload->imu_quat_x;
+        msg.imu_quat_y = payload->imu_quat_y;
+        msg.imu_quat_z = payload->imu_quat_z;
+        msg.order = payload->order;
+        msg.remaining_time_s = payload->remaining_time_s;
+        msg.sentry_behavior_mode = payload->sentry_behavior_mode;
+        msg.colour = payload->colour;
       }
       if (!decoded) {
         const auto payload_size = frame.size() >= 4 ? frame.size() - 4 : 0;

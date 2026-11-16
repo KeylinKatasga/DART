@@ -6,7 +6,6 @@ find_package(Ceres REQUIRED)
 find_package(dart_interfaces REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(mcu_node REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
@@ -21,7 +20,7 @@ target_compile_features(dart_self_estimate_node PRIVATE cxx_std_20)
 target_compile_options(dart_self_estimate_node PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(dart_self_estimate_node self_ekf)
 ament_target_dependencies(
-  dart_self_estimate_node dart_interfaces diagnostic_msgs mcu_node rclcpp sensor_msgs)
+  dart_self_estimate_node dart_interfaces diagnostic_msgs rclcpp sensor_msgs)
 
 install(TARGETS self_ekf dart_self_estimate_node
   ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION lib/${PROJECT_NAME})

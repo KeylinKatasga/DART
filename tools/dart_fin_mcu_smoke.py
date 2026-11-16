@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PTY smoke test for dart_fin_v1 RX and four-angle TX."""
+"""PTY smoke test for the simplified MCU quaternion RX and fin-command TX."""
 
 import os
 from pathlib import Path
@@ -61,13 +61,10 @@ def main() -> int:
             "-p",
             f"device:={os.ttyname(slave)}",
             "-p",
-            "protocol_mode:=dart_fin_v1",
-            "-p",
             "actuator_output_enabled:=true",
         ]
     )
-    rx_values = (1.0, 0.1, 0.2, 0.3, 12.0, -0.5, 0.01, 0.02, 0.03, 0.04)
-    rx_payload = struct.pack("<10f", *rx_values)
+    rx_payload = struct.pack("<4fhhbBQ", 1.0, 0.1, 0.2, 0.3, 2, 7, 3, 1, 8)
     rx_frame = bytes([0x3E, len(rx_payload)]) + rx_payload + crc16(rx_payload)
     tx_bytes = bytearray()
     try:
@@ -93,26 +90,28 @@ def main() -> int:
                     tx_bytes.extend(os.read(master, 1024))
                 except BlockingIOError:
                     pass
-            if command_sent and len(tx_bytes) >= 20:
+            if command_sent and len(tx_bytes) >= 26:
                 break
             time.sleep(0.01)
 
         rx = received["rx"]
-        assert rx is not None, "no dart_fin_v1 RX message"
-        assert rx.imu_quat_w == 1.0 and rx.vehicle_x_vel == 12.0
-        assert abs(rx.angle1 - 0.01) < 1e-6 and abs(rx.angle4 - 0.04) < 1e-6
-        start = tx_bytes.find(b"\x3e\x10")
-        assert start >= 0 and len(tx_bytes) >= start + 20, "no complete dart_fin_v1 TX frame"
-        tx_frame = bytes(tx_bytes[start : start + 20])
+        assert rx is not None, "no simplified MCU RX message"
+        assert rx.imu_quat_w == 1.0 and rx.order == 2 and rx.remaining_time_s == 7
+        assert rx.sentry_behavior_mode == 3 and rx.colour == 1
+        assert rx.device_sample_time_us == 8
+        start = tx_bytes.find(b"\x3e\x16")
+        assert start >= 0 and len(tx_bytes) >= start + 26, "no complete fin TX frame"
+        tx_frame = bytes(tx_bytes[start : start + 26])
         assert tx_frame[-2:] == crc16(tx_frame[2:-2]), "TX CRC mismatch"
-        tx_angles = struct.unpack("<4f", tx_frame[2:-2])
+        tx_angles = struct.unpack("<4f", tx_frame[2:18])
+        enable_lock, enable_shoot, waterfall = struct.unpack("<BBi", tx_frame[18:-2])
         expected = (0.11, 0.22, 0.33, 0.44)
         assert all(abs(actual - wanted) < 1e-6 for actual, wanted in zip(tx_angles, expected))
+        assert (enable_lock, enable_shoot, waterfall) == (1, 0, 0)
         print(
-            "PASS: dart_fin_v1 RX/TX; "
-            f"velocity=({rx.vehicle_x_vel:.2f},{rx.vehicle_y_vel:.2f}) "
-            f"feedback=({rx.angle1:.2f},{rx.angle2:.2f},{rx.angle3:.2f},{rx.angle4:.2f}) "
-            f"tx={tx_angles}"
+            "PASS: simplified MCU RX/TX; "
+            f"quaternion=({rx.imu_quat_w:.2f},{rx.imu_quat_x:.2f},"
+            f"{rx.imu_quat_y:.2f},{rx.imu_quat_z:.2f}) tx={tx_angles}"
         )
         return 0
     finally:

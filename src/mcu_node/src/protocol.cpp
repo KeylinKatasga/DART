@@ -77,12 +77,10 @@ std::vector<std::uint8_t> encode(const SendPayload & p)
 {
   std::vector<std::uint8_t> payload;
   payload.reserve(kSendPayloadSize);
-  append_le(payload, p.yaw);
-  append_le(payload, p.yaw_vel);
-  append_le(payload, p.yaw_acc);
-  append_le(payload, p.pitch);
-  append_le(payload, p.pitch_vel);
-  append_le(payload, p.pitch_acc);
+  append_le(payload, p.angle1);
+  append_le(payload, p.angle2);
+  append_le(payload, p.angle3);
+  append_le(payload, p.angle4);
   append_le(payload, p.enable_lock);
   append_le(payload, p.enable_shoot);
   append_le(payload, p.autoaim_living_waterfall_flag);
@@ -96,15 +94,6 @@ std::optional<ReceivePayload> decode_receive(std::span<const std::uint8_t> frame
   const auto bytes = frame.subspan(2, kReceivePayloadSize);
   std::size_t offset = 0;
   ReceivePayload p;
-  p.imu_yaw = read_le<float>(bytes, offset);
-  p.imu_pitch = read_le<float>(bytes, offset);
-  p.imu_roll = read_le<float>(bytes, offset);
-  p.imu_yaw_vel = read_le<float>(bytes, offset);
-  p.imu_pitch_vel = read_le<float>(bytes, offset);
-  p.imu_roll_vel = read_le<float>(bytes, offset);
-  p.imu_yaw_acc = read_le<float>(bytes, offset);
-  p.imu_pitch_acc = read_le<float>(bytes, offset);
-  p.imu_roll_acc = read_le<float>(bytes, offset);
   p.imu_quat_w = read_le<float>(bytes, offset);
   p.imu_quat_x = read_le<float>(bytes, offset);
   p.imu_quat_y = read_le<float>(bytes, offset);
@@ -114,40 +103,6 @@ std::optional<ReceivePayload> decode_receive(std::span<const std::uint8_t> frame
   p.sentry_behavior_mode = read_le<std::int8_t>(bytes, offset);
   p.colour = read_le<std::uint8_t>(bytes, offset);
   p.system_time_point_us = read_le<std::uint64_t>(bytes, offset);
-  return p;
-}
-
-std::vector<std::uint8_t> encode_dart_fin(const DartSendPayload & p)
-{
-  std::vector<std::uint8_t> payload;
-  payload.reserve(kDartSendPayloadSize);
-  append_le(payload, p.angle1);
-  append_le(payload, p.angle2);
-  append_le(payload, p.angle3);
-  append_le(payload, p.angle4);
-  if (payload.size() != kDartSendPayloadSize) {
-    throw std::logic_error("invalid dart fin send payload layout");
-  }
-  return make_frame(payload);
-}
-
-std::optional<DartReceivePayload> decode_dart_receive(
-  const std::span<const std::uint8_t> frame)
-{
-  if (!verify_frame(frame, kDartReceivePayloadSize)) {return std::nullopt;}
-  const auto bytes = frame.subspan(2, kDartReceivePayloadSize);
-  std::size_t offset = 0;
-  DartReceivePayload p;
-  p.imu_quat_w = read_le<float>(bytes, offset);
-  p.imu_quat_x = read_le<float>(bytes, offset);
-  p.imu_quat_y = read_le<float>(bytes, offset);
-  p.imu_quat_z = read_le<float>(bytes, offset);
-  p.vehicle_x_vel = read_le<float>(bytes, offset);
-  p.vehicle_y_vel = read_le<float>(bytes, offset);
-  p.angle1 = read_le<float>(bytes, offset);
-  p.angle2 = read_le<float>(bytes, offset);
-  p.angle3 = read_le<float>(bytes, offset);
-  p.angle4 = read_le<float>(bytes, offset);
   return p;
 }
 }  // namespace mcu_node

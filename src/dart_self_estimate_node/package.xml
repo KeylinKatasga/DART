@@ -10,7 +10,6 @@
   <depend>dart_interfaces</depend>
   <depend>diagnostic_msgs</depend>
   <depend>eigen</depend>
-  <depend>mcu_node</depend>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <test_depend>ament_cmake_gtest</test_depend>

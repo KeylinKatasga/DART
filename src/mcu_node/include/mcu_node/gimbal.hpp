@@ -36,7 +36,6 @@ private:
   std::chrono::steady_clock::time_point last_tx_success_{};
   std::chrono::steady_clock::time_point last_tx_failure_{};
   double tx_stale_after_s_{2.0};
-  std::string protocol_mode_{"gimbal_legacy"};
   bool actuator_output_enabled_{false};
   std::uint64_t fin_commands_received_{0};
   rclcpp::Publisher<mcu_node::msg::Rx>::SharedPtr state_pub_;

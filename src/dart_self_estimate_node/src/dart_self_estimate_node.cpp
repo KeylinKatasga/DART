@@ -9,11 +9,11 @@
 
 #include <Eigen/Dense>
 
+#include "dart_interfaces/msg/fin_command.hpp"
 #include "dart_interfaces/msg/self_state.hpp"
 #include "dart_self_estimate_node/self_ekf.hpp"
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
-#include "mcu_node/msg/rx.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 
@@ -47,8 +47,8 @@ public:
   DartSelfEstimateNode() : Node("dart_self_estimate_node")
   {
     imu_topic_ = declare_parameter<std::string>("imu_topic", "/imu/data");
-    fin_feedback_topic_ = declare_parameter<std::string>(
-      "fin_feedback_topic", "/mcu_node/message/rx");
+    fin_input_topic_ = declare_parameter<std::string>(
+      "fin_input_topic", "/mcu_node/message/fin_tx");
     SelfEkfConfig config;
     config.mass_kg = declare_parameter<double>("dynamics.mass_kg", config.mass_kg);
     config.inertia_diagonal = matrix_parameter<3, 1>(
@@ -80,11 +80,16 @@ public:
     state_pub_ = create_publisher<dart_interfaces::msg::SelfState>("~/state", reliable_qos);
     diagnostics_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
       "/diagnostics", rclcpp::QoS(10).reliable());
-    fin_sub_ = create_subscription<mcu_node::msg::Rx>(
-      fin_feedback_topic_, reliable_qos,
-      [this](const mcu_node::msg::Rx & message) {
+    fin_sub_ = create_subscription<dart_interfaces::msg::FinCommand>(
+      fin_input_topic_, reliable_qos,
+      [this](const dart_interfaces::msg::FinCommand & message) {
         std::lock_guard lock(mutex_);
-        fin_angles_ = {message.angle1, message.angle2, message.angle3, message.angle4};
+        if (message.neutral) {
+          fin_angles_.fill(0.0);
+        } else if (message.valid && message.armed) {
+          std::copy(
+            message.deflection_rad.begin(), message.deflection_rad.end(), fin_angles_.begin());
+        }
       });
     imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
       imu_topic_, rclcpp::SensorDataQoS(),
@@ -156,7 +161,7 @@ private:
   }
 
   std::string imu_topic_;
-  std::string fin_feedback_topic_;
+  std::string fin_input_topic_;
   std::unique_ptr<SelfEkf> filter_;
   std::mutex mutex_;
   std::array<double, 4> fin_angles_{};
@@ -164,7 +169,7 @@ private:
   rclcpp::Time previous_publish_stamp_{0, 0, RCL_ROS_TIME};
   bool last_update_accepted_{true};
   std::uint64_t samples_{0};
-  rclcpp::Subscription<mcu_node::msg::Rx>::SharedPtr fin_sub_;
+  rclcpp::Subscription<dart_interfaces::msg::FinCommand>::SharedPtr fin_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Publisher<dart_interfaces::msg::SelfState>::SharedPtr state_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub_;
