@@ -61,16 +61,7 @@ def main() -> int:
     master, slave = pty.openpty()
     tty.setraw(slave)
     payload = struct.pack(
-        "<13fhhbBQ",
-        12.5,
-        -3.0,
-        1.0,
-        0.2,
-        0.3,
-        0.4,
-        0.5,
-        0.6,
-        0.7,
+        "<4fhhbBQ",
         1.0,
         0.0,
         0.0,
@@ -81,7 +72,7 @@ def main() -> int:
         1,
         123456,
     )
-    frame = bytes([0x3E, 66]) + payload + crc16(payload)
+    frame = bytes([0x3E, 30]) + payload + crc16(payload)
     processes = [
         subprocess.Popen(
             [
@@ -124,13 +115,13 @@ def main() -> int:
         estimate = received["estimate"]
         assert rx is not None, "no decoded MCU Rx message"
         assert estimate is not None, "no TargetState message"
-        assert rx.imu_yaw == 12.5 and rx.device_sample_time_us == 123456
+        assert rx.imu_quat_w == 1.0 and rx.device_sample_time_us == 123456
         assert estimate.valid and estimate.imu_valid and estimate.target_detected
         assert estimate.sequence == 7
         assert not estimate.imu_units_verified
         print(
             "PASS: MCU frame decoded and estimate published; "
-            f"rx_sequence={rx.sequence} imu_roll_raw={estimate.imu_roll_raw} "
+            f"rx_sequence={rx.sequence} quat_w={estimate.imu_quaternion_w} "
             f"imu_age_s={estimate.imu_age_s:.6f}"
         )
         return 0
