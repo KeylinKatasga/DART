@@ -29,3 +29,12 @@ dart_calculate_node.ros__parameters.safety.output_enabled: false
 ```
 
 完成舵机零位、方向、限位及动力学参数确认前，不要开启它们。
+
+合成绿灯左右移动并进行舵机小幅实机测试：
+
+```bash
+./start_compute.sh --servo-test
+```
+
+终端会打印目标像素、方位角、控制量、四舵角和串口发送确认；Foxglove 连接地址为
+`ws://localhost:8765`。
